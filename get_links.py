@@ -27,5 +27,5 @@ for i in range(1, int(n_pages)+1):
 
 driver.close()
 
-with open (f"{quadro}-links.txt", "w") as txtFile:
+with open (f"./links/{quadro}-links.txt", "w") as txtFile:
     txtFile.write(eps_links)
