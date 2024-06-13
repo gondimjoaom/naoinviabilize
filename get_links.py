@@ -1,31 +1,58 @@
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-import sys
 
+from pathlib import Path
+from tqdm import tqdm
+
+# selenium setup
 options = webdriver.ChromeOptions()
 options.add_argument("--headless=new")
-
-quadro = sys.argv[1]
-
-quadro_link = f"https://naoinviabilize.com.br/quadros/{quadro}/"
-
 driver = webdriver.Chrome(options=options)
-driver.get(quadro_link)
-pages = driver.find_elements(By.CLASS_NAME, 'page-numbers')
-n_pages = pages[-2].get_attribute("text")
-eps_links = ""
-for i in range(1, int(n_pages)+1):
-    driver.get(f"{quadro_link}page/{i}/")
 
-    n_eps = driver.find_element(By.XPATH, '//*[@id="ajax-content-wrap"]/div[2]/div/div/div[1]/div[1]').get_attribute("childElementCount")
-    
-    for i in range(1, int(n_eps)+1):
-        ep_link = driver.find_element(By.XPATH, f'/html/body/div[1]/div/div[3]/div[2]/div/div/div[1]/div[1]/article[{i}]/div/div/div/a').get_attribute("href")
-        # eps_links.append(ep_link)
-        eps_links += f"{ep_link}\n"
+
+# set file path
+quadros_file_path = Path('./quadros.txt')
+
+
+# get quadros from file
+quadros = []
+
+with quadros_file_path.open('r') as quadros_file:
+    text = quadros_file.read()
+    quadros = text.split('\n')[:-1]
+
+
+# retrieve all episodes for each quadro
+all_episodes = dict()
+
+for quadro in tqdm(quadros):
+    quadro_link = f"https://naoinviabilize.com.br/quadros/{quadro}/"
+
+    try:
+        driver.get(quadro_link)
+
+        pages = driver.find_elements(By.CLASS_NAME, 'page-numbers')
+        n_pages = pages[-2].get_attribute("text")
+        eps_links = []
+
+        for i in range(1, int(n_pages)+1):
+            driver.get(f"{quadro_link}page/{i}")
+
+            n_eps = driver.find_element(By.XPATH, '//*[@id="ajax-content-wrap"]/div[2]/div/div/div[1]/div[1]').get_attribute("childElementCount")
+            
+            for i in range(1, int(n_eps)+1):
+                ep_link = driver.find_element(By.XPATH, f'/html/body/div[1]/div/div[3]/div[2]/div/div/div[1]/div[1]/article[{i}]/div/div/div/a').get_attribute("href")
+                eps_links.append(ep_link)
+
+        all_episodes[quadro] = eps_links
+    except Exception as e:
+        print(f'Error retrieving episodes from: {quadro_link}. Error: {e}')
+
 
 driver.close()
 
-with open (f"./links/{quadro}-links.txt", "w") as txtFile:
-    txtFile.write(eps_links)
+# save episode links from each quadro
+for quadro, eps_links in all_episodes.items():
+    with open (f"./links/{quadro}-links.txt", "w") as text_file:
+        txt_eps_links = '\n'.join(eps_links)
+        text_file.write(txt_eps_links)
