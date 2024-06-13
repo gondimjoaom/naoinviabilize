@@ -1,60 +1,111 @@
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
-import sys, json
-from tqdm import tqdm
 
+from tqdm import tqdm
+from pathlib import Path
+
+import re
+import html
+import json
+
+# selenium setup
 options = webdriver.ChromeOptions()
 options.add_argument("--headless=new")
-
-links_file = sys.argv[1]
-
-quadro = links_file.split(".")[0]
-
-with open(links_file, 'r') as txtLinks:
-    links = txtLinks.read()
 driver = webdriver.Chrome(options=options)
 
-transcriptions = {}
+# get links folder path
+links_folder = Path('./links')
 
-for link in tqdm(links.split("\n")[:-1]):
-    
-    driver.get(link)
-    try:
-        # texts_div = driver.find_element(By.XPATH, '/html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div')
-        # content-inner
-        texts_div = driver.find_element(By.CLASS_NAME, 'content-inner')
-    except:
-        print(link)
-    texts = texts_div.find_elements(By.CSS_SELECTOR, "p")
-    # print(text)
-    # print(len(text))
-    n_texts = len(texts)
-    # /html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div/p[17]
-    transcription = ""
-    for n in range(1, n_texts+1):
-        # try:
-        #     # text = driver.find_element(By.XPATH, f"/html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div/p[{n}]")
-        #     #                                         /html/body/div[1]/div/div[3]/div[1]/div/div[1]/div/article/div/div/div/p[1]
-        #     #                                         /html/body/div[1]/div/div[3]/div[1]/div/div[1]/div/article/div/div/div/p[2]
-        # except:
-        #     print(link)
-        text_content = texts[n-1].get_attribute("innerHTML")
-        transcription += f"{text_content}\n"
-    
-    name = link.split("/")[-2]
-    transcriptions[name] = {
-        "link" : link,
-        "quadro" : quadro,
-        "transcrição" : transcription
-    }
-    # break
 
-with open(f"{quadro}.json", "w", encoding='utf-8') as jsonFile:
-    json.dump(transcriptions, jsonFile, indent=4, ensure_ascii=False)
+# retrieve links from all files
+all_links = dict()
 
-#     break
-# print(transcriptions)
-    # texts = driver.find_elements(By.XPATH, '/html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div/p[1]')
-                                            # /html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div/p[2]
-# /html/body/div[1]/div/div[3]/div[2]/div/div[1]/div/article/div/div/div/p[1]
+for link_file in links_folder.iterdir():
+    # get quadro from file name
+    quadro = link_file.stem.split('-')[0]
+
+    # read links from file
+    with link_file.open('r') as links_file:
+        links_plain = links_file.read()
+        all_links[quadro] = links_plain.split('\n')[:-1]
+
+
+# extract/crawl transcriptions
+all_transcriptions = {}
+
+for quadro, links in all_links.items():
+    all_transcriptions[quadro] = []
+
+    for link in tqdm(links):
+        try:
+            driver.get(link)
+
+            # extract transcription from html
+            texts_div = driver.find_element(By.CLASS_NAME, 'content-inner')
+
+            html_content = texts_div.get_attribute("innerHTML") # get HTML content of text
+            
+            html_content = re.sub(re.compile('&nbsp;'), ' ', html_content) # replace &nbsp; (non-breaking spaces) with normal spaces
+            html_content = re.sub(re.compile('<br>'), '\n', html_content) # replace new line HTML tag with new line character
+            html_content = html.unescape(html_content) # unescape other HTML entities like &nbsp;
+            
+            html_content = re.sub(re.compile('<.*?>'), '', html_content) # remove all remaining HTML tags
+            
+            # set full transcription
+            full_transcription = f"{html_content}"
+            
+            # split transcription into header and content
+            if 'TRANSCRIÇÃO' in full_transcription:
+                split_key = 'TRANSCRIÇÃO'
+            elif '[vinheta]' in full_transcription:
+                split_key = '[vinheta]'
+            else:
+                raise Exception('Could not find split key for transcription')
+            
+            raw_transcription_header, raw_transcription_content = full_transcription.split(split_key, maxsplit=1)
+            transcription_header = raw_transcription_header.strip().split('\n')
+            transcription_content = raw_transcription_content.strip()
+
+            # indicate header metadata
+            header_metadata = [
+                {
+                    'field': 'title',
+                    'prefix': 'título: ',
+                },
+                {
+                    'field': 'publishing_date',
+                    'prefix': 'data de publicação: ',
+                },
+                {
+                    'field': 'quadro',
+                    'prefix': 'quadro: ',
+                },
+                {
+                    'field': 'hashtag',
+                    'prefix': 'hashtag: ',
+                },
+                {
+                    'field': 'characters',
+                    'prefix': 'personagens: ',
+                }
+            ]
+
+            # get transcription attributes
+            transcription = dict()
+            for header in transcription_header:
+                for metadata in header_metadata:
+                    if header.startswith(metadata['prefix']):
+                        transcription[metadata['field']] = header.removeprefix(metadata['prefix'])
+            transcription['transcription'] = transcription_content
+            
+            # add episode transcription to all transcriptions
+            all_transcriptions[quadro].append(transcription)
+
+        except Exception as e:
+            print(f'Error extracting transcription from: {link}. Error: {e}')
+
+
+for quadro, transcriptions in all_transcriptions.items():
+    # save transcriptions to json file
+    with open(f"./transcriptions/{quadro}.json", "w", encoding='utf-8') as jsonFile:
+        json.dump(transcriptions, jsonFile, indent=4, ensure_ascii=False)
