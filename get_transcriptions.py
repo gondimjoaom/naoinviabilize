@@ -22,7 +22,7 @@ all_links = dict()
 
 for link_file in links_folder.iterdir():
     # get quadro from file name
-    quadro = link_file.stem.split('-')[0]
+    quadro = link_file.stem
 
     # read links from file
     with link_file.open('r') as links_file:
@@ -56,13 +56,13 @@ for quadro, links in all_links.items():
             
             # split transcription into header and content
             if 'TRANSCRIÇÃO' in full_transcription:
-                split_key = 'TRANSCRIÇÃO'
+                raw_transcription_header, raw_transcription_content = full_transcription.split('TRANSCRIÇÃO', maxsplit=1)
             elif '[vinheta]' in full_transcription:
-                split_key = '[vinheta]'
+                raw_transcription_header, raw_transcription_content = full_transcription.split('[vinheta]', maxsplit=1)
+                raw_transcription_content = f"[vinheta]{raw_transcription_content}"
             else:
                 raise Exception('Could not find split key for transcription')
             
-            raw_transcription_header, raw_transcription_content = full_transcription.split(split_key, maxsplit=1)
             transcription_header = raw_transcription_header.strip().split('\n')
             transcription_content = raw_transcription_content.strip()
 
@@ -107,5 +107,8 @@ for quadro, links in all_links.items():
 
 # save transcriptions to json file
 for quadro, transcriptions in all_transcriptions.items():
-    with open(f"./transcriptions/{quadro}.json", "w", encoding='utf-8') as jsonFile:
-        json.dump(transcriptions, jsonFile, indent=4, ensure_ascii=False)
+    transcriptions_file = Path(f"./transcriptions/{quadro}.json")
+    transcriptions_file.parent.mkdir(exist_ok=True, parents=True)
+    
+    with transcriptions_file.open("w", encoding='utf-8') as json_file:
+        json.dump(transcriptions, json_file, indent=4, ensure_ascii=False)

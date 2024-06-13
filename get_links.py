@@ -52,7 +52,10 @@ for quadro in tqdm(quadros):
 driver.close()
 
 # save episode links from each quadro
-for quadro, eps_links in all_episodes.items():
-    with open (f"./links/{quadro}-links.txt", "w") as text_file:
-        txt_eps_links = '\n'.join(eps_links)
-        text_file.write(txt_eps_links)
+for quadro, episodes_links in all_episodes.items():
+    links_file = Path(f"./links/{quadro}.txt")
+    links_file.parent.mkdir(exist_ok=True, parents=True)
+    
+    with links_file.open("w") as text_file:
+        txt_episodes_links = '\n'.join(episodes_links)
+        text_file.write(txt_episodes_links)
