@@ -105,7 +105,7 @@ for quadro, links in all_links.items():
             print(f'Error extracting transcription from: {link}. Error: {e}')
 
 
+# save transcriptions to json file
 for quadro, transcriptions in all_transcriptions.items():
-    # save transcriptions to json file
     with open(f"./transcriptions/{quadro}.json", "w", encoding='utf-8') as jsonFile:
         json.dump(transcriptions, jsonFile, indent=4, ensure_ascii=False)
