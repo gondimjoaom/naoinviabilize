@@ -10,3 +10,5 @@ spacy
 thefuzz
 langchain
 langchain-groq
+ragas
+notebook
