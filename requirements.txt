@@ -4,6 +4,8 @@ llama-index-llms-groq
 llama-index-retrievers-bm25
 llama-index
 nest-asyncio
+transformers
+sentencepiece
 sentence-transformers
 matplotlib
 spacy
@@ -11,4 +13,3 @@ thefuzz
 langchain
 langchain-groq
 ragas
-notebook
