@@ -17,5 +17,3 @@ notebook
 ipywidgets 
 widgetsnbextension
 protobuf
-rerankers
-
